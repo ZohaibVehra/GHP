@@ -1,0 +1,32 @@
+{
+  "name": "ghp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZohaibVehra/GHP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/ZohaibVehra/GHP/issues"
+  },
+  "homepage": "https://github.com/ZohaibVehra/GHP#readme",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@octokit/app": "^16.1.2",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "octokit": "^5.0.5"
+  }
+}
