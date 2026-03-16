@@ -1,12 +1,17 @@
 import express from "express"
-import { App } from "octokit"
-import fs from "fs"
 import dotenv from "dotenv"
 import crypto from "crypto"
+import { myQueue } from "./queue.js"
 
 dotenv.config()
 
 const app = express()
+
+interface GitHubWebhookJobData {
+  event?: string
+  deliveryId?: string
+  payload?: unknown
+}
 
 app.use(express.json({
   verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
@@ -14,12 +19,10 @@ app.use(express.json({
   }
 }))
 
-const privateKey = fs.readFileSync(process.env.GITHUB_PRIVATE_KEY_PATH!, "utf8")
 
-const githubApp = new App({
-  appId: process.env.GITHUB_APP_ID!,
-  privateKey,
-})
+if (!process.env.GITHUB_WEBHOOK_SECRET) {
+  throw new Error("Missing GITHUB_WEBHOOK_SECRET")
+}
 
 function verifyGitHubSignature(req: express.Request & { rawBody?: Buffer }) {
   const signature = req.header("x-hub-signature-256")
@@ -56,43 +59,30 @@ app.post("/webhook", async (req: express.Request & { rawBody?: Buffer }, res) =>
       return
     }
 
-    const event = req.headers["x-github-event"]
-    console.log("verified event:", event)
+    const eventHeader = req.headers["x-github-event"]
+    const deliveryHeader = req.headers["x-github-delivery"]
 
-    if (event === "push") {
-      const installationId = req.body.installation?.id
-      const owner = req.body.repository?.owner?.login
-      const repo = req.body.repository?.name
+    const event = typeof eventHeader === "string" ? eventHeader : undefined
+    const deliveryId = typeof deliveryHeader === "string" ? deliveryHeader : undefined
 
-      if (!installationId || !owner || !repo) {
-        res.sendStatus(400)
-        return
-      }
-
-      const auth = await githubApp.getInstallationOctokit(installationId)
-
-      const authResult = await auth.auth({
-        type: "installation"
-      })
-
-      if (!authResult || typeof authResult !== "object" || !("token" in authResult)) {
-        throw new Error("Failed to get installation token")
-      }
-
-      console.log(
-        "installation token:",
-        String(authResult.token).substring(0, 20) + "..."
-      )
-
-      const repoInfo = await auth.request("GET /repos/{owner}/{repo}", {
-        owner,
-        repo,
-      })
-
-      console.log("repo:", repoInfo.data.full_name)
-      console.log("default branch:", repoInfo.data.default_branch)
+    if (!event || !deliveryId) {
+      res.sendStatus(400)
+      return
     }
 
+    console.log("From server, verified event:", event)
+    console.log("From server, delivery id:", deliveryId)
+
+    const jobData: GitHubWebhookJobData = {
+      event,
+      deliveryId,
+      payload: req.body,
+    }
+
+    await myQueue.add("github-webhook", jobData, {
+      jobId: deliveryId,
+    })
+  
     res.sendStatus(200)
   } catch (err) {
     console.error(err)
